@@ -7,7 +7,7 @@
 
 #define buffer_max 32;
 
-
+/*Extracting tokens from terminal input*/
 char **extract_token(char *line){
     /*Declare Variables*/
     int buffer = buffer_max;
@@ -45,26 +45,44 @@ char **extract_token(char *line){
     return tokens;
 }
 
-int process_exec(char **args){
+/*Command Argument Line*/
+void process_exec(char **args){
+    /*Variables*/
+    int status;
+    //int cexit_status;
+    int exit_status;
+
+    char *exit_name = "exit";
     
-    int rc  = fork();
+    if(strcmp(args[0], exit_name) == 0){
+        exit(0);
+        return;
+    }
+
+    pid_t rc  = fork();
 
     if(rc < 0){
         //fork failed
-        fprintf(stderr, "Fail to create process");
+        fprintf(stderr, "Fail to create process\n");
         exit(1);
     }
     else if(rc == 0){
-        execvp(args[0], args);
+        //printf("Executing Process ID: %d\n", (int) getpid());
+        if(execvp(args[0], args) == -1){
+            //cexit_status = 127;
+            //printf("jsh status: %d\n", cexit_status);
+            exit(127);            
+        }
     }
     else{
-        //int rc_wait = wait(NULL);
-        printf("Executing Process \n");
-    }
+        waitpid(rc, &status, 0);
 
-    return 1;
+        if(WIFEXITED(status)){
+            exit_status = WEXITSTATUS(status);
+            printf("jsh status: %d\n", exit_status);
+        }       
+    }    
 }
-
 
 /*Main Function*/
 int main(int argc, char const *argv[])
@@ -72,31 +90,29 @@ int main(int argc, char const *argv[])
     /*Set up void variables*/
     (void)argc;
     (void)argv;
-    
-    /* Main code */
-    /* Variables */
-    char *prompt = "jsh$";    
-    char *line = NULL;
-    size_t size = 0;
-    
-    char **tokens;  
-    int status;
 
+    /*Main Loop*/    
     do{
+        /*Variables*/
+        char *prompt = "jsh$";    
+        char *line = NULL;
+        char **tokens;
+        size_t size = 0;
+        
         /*Get Input from the user*/
         printf("%s ", prompt);
         getline(&line ,&size, stdin);
         
-        /*Call a function split the input into arguments */
-        tokens = extract_token(line);
-        status = process_exec(tokens);
+        // /*Call a function split the input into arguments */
+        tokens = extract_token(line);        
+        process_exec(tokens);
 
-
+        //printf();
         free(line);
         free(tokens);
 
     }
-    while(status != 0);
+    while(1);
 
     return 0;
 }
