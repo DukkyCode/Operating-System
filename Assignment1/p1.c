@@ -9,14 +9,16 @@
 void process_exec(char *args[100][100], int process_num){
     /*Variables*/
     int status;
-    int exit_status;
+    //int exit_status;
     int i = 0;
     int j = 0;
+    //int pipe_num = 2 * (process_num);
+    int fd[process_num][2];
     char *exit_name = "exit";
     pid_t pids[100];
-    pid_t wpid;
-    
+    //pid_t wpid;
 
+    
     //Built-in Commands -- Check for Exit
     for(j = 0; j <= process_num; j++){
         if(strcmp(args[j][0], exit_name) == 0){
@@ -24,29 +26,65 @@ void process_exec(char *args[100][100], int process_num){
             return;
         }
     }
+    
+    //Parent process create necessaray pipes
+    for(i = 0; i < process_num; i++){
+        if(pipe(&fd[i][2])){
+            //fork failed
+            fprintf(stderr, "Fail to create process\n");
+            exit(1);
+        }
+    }
 
     //Child Process
-    for(i =0; i <= process_num; i++){
+    for(i = 0; i <= process_num; i++){
+
+
         pids[i] = fork();
+        
         if(pids[i] < 0){
             //fork failed
             fprintf(stderr, "Fail to create process\n");
             exit(1);
         }
         else if(pids[i] == 0){
+            if(i == process_num){
+                if(i == 0){
+                    dup2(fd[i][1], STDOUT_FILENO);
+                }
+                if(i != 0){
+                    dup2(fd[i][0], STDIN_FILENO);
+                }
+            }
+            else{
+                dup2(fd[i][1], STDOUT_FILENO); 
+                dup2(fd[i - 1][0], STDIN_FILENO);           
+            }
+            
+            //Close the first 2 pipe of the Child
+            for(j = 0; j < process_num; j ++){
+                close(*fd[j]);                
+            }
+
+            //Executing Process
             if(execvp(args[i][0], args[i]) == -1){
                 exit(127);
+                return;
             }
         }
     }
+   
+    for(i = 0; i < process_num; i ++){
+        close(*fd[i]);
+    }
 
     //Parent Process Waiting for all Child processes
-    while((wpid = waitpid(-1, &status, 0)) != -1){
+    for(i =0; i <= process_num; i++){
+        waitpid(pids[i], &status, 0);
         if(WIFEXITED(status)){
-            exit_status = WEXITSTATUS(status);
-            printf("jsh status: %d\n", exit_status);
+            printf("jsh status: %d\n", WEXITSTATUS(status));
         }   
-    }
+    }    
 }
 
 /*Main Function*/
