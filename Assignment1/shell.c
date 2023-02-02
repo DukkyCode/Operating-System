@@ -12,13 +12,11 @@ void process_exec(char *args[100][100], int process_num){
     //int exit_status;
     int i = 0;
     int j = 0;
-    //int pipe_num = 2 * (process_num);
     int fd[process_num][2];
     char *exit_name = "exit";
     pid_t pids[100];
-    //pid_t wpid;
 
-    
+
     //Built-in Commands -- Check for Exit
     for(j = 0; j <= process_num; j++){
         if(strcmp(args[j][0], exit_name) == 0){
@@ -29,16 +27,15 @@ void process_exec(char *args[100][100], int process_num){
     
     //Parent process create necessaray pipes
     for(i = 0; i < process_num; i++){
-        if(pipe(&fd[i][2])){
+        if(pipe(fd[i]) < 0){
             //fork failed
-            fprintf(stderr, "Fail to create process\n");
+            fprintf(stderr, "Fail to create a pipe between processes\n");
             exit(1);
         }
     }
 
     //Child Process
     for(i = 0; i <= process_num; i++){
-
 
         pids[i] = fork();
         
@@ -49,13 +46,16 @@ void process_exec(char *args[100][100], int process_num){
         }
         else if(pids[i] == 0){
             if(i == process_num){
-                if(i == 0){
-                    dup2(fd[i][1], STDOUT_FILENO);
+                //First Argument
+		if(i == 0){
+                    dup2(fd[i][1], STDOUT_FILENO);			
                 }
+		//Last Argument
                 if(i != 0){
-                    dup2(fd[i][0], STDIN_FILENO);
+                    dup2(fd[i - 1][0], STDIN_FILENO);
                 }
             }
+	    //Argument in between
             else{
                 dup2(fd[i][1], STDOUT_FILENO); 
                 dup2(fd[i - 1][0], STDIN_FILENO);           
@@ -63,7 +63,8 @@ void process_exec(char *args[100][100], int process_num){
             
             //Close the first 2 pipe of the Child
             for(j = 0; j < process_num; j ++){
-                close(*fd[j]);                
+                close(fd[j][0]);
+		close(fd[j][1]);                
             }
 
             //Executing Process
@@ -75,16 +76,20 @@ void process_exec(char *args[100][100], int process_num){
     }
    
     for(i = 0; i < process_num; i ++){
-        close(*fd[i]);
+        close(fd[i][0]);
+        close(fd[i][1]);
     }
 
     //Parent Process Waiting for all Child processes
     for(i =0; i <= process_num; i++){
-        waitpid(pids[i], &status, 0);
-        if(WIFEXITED(status)){
-            printf("jsh status: %d\n", WEXITSTATUS(status));
-        }   
-    }    
+        waitpid(pids[i], &status, 0);    
+    }
+    
+    //Print Error Statement
+    if(WIFEXITED(status)){
+        printf("jsh status: %d\n", WEXITSTATUS(status));
+    }
+    
 }
 
 /*Main Function*/
