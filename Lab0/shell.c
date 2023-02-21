@@ -5,6 +5,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+/*Name: Duc Anh Nguyen*/
+
 /*Command Argument Line*/
 void process_exec(char *args[100][100], int process_num){
     /*Variables*/
@@ -118,29 +120,30 @@ int main(int argc, char const *argv[])
         /*Get Input from the user*/
         printf("%s ", prompt);
         fgets(line, sizeof(line), stdin);
-               
-        /*Extracting the tokens*/
-        token = strtok(line, delim);
-            
-        while(token != NULL){
-            tokens[i][j] = token;
+	
+	if(line[0] != '\n'){
+            /*Extracting the tokens*/
+            token = strtok(line, delim);
 
-            if(strcmp(tokens[i][j], "|") == 0){
-                tokens[i][j] = NULL;
-                i = i + 1;
-                j = 0;
-                token = strtok(NULL, delim);
-            }
-            else{
-                j++;
-                token = strtok(NULL, delim);
-            }                     
-        }
-        tokens[i][j] = NULL;
-        process_exec(tokens, i);
-        
-    }
+            while(token != NULL){
+                tokens[i][j] = token;
 
+                if(strcmp(tokens[i][j], "|") == 0){
+                    tokens[i][j] = NULL;
+                    i = i + 1;
+                    j = 0;
+                    token = strtok(NULL, delim);
+                }
+                else{
+                    j++;
+                    token = strtok(NULL, delim);
+                }
+             }
+             tokens[i][j] = NULL;
+             process_exec(tokens, i);
+	}
+    }        
+          
     return 0;
 }
 
