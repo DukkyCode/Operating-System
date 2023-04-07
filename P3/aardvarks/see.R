@@ -181,6 +181,32 @@ plot.allHistory <- function(all, low=0, high=1e25) {
 # use the system to visualize results
 #========================================================
 
-# read file from disk into full history 
-all <- allHistory()
-plot(all); 
+# Get all the output files with the naming convention 'output_#.csv' in the current directory
+output_files <- list.files(pattern = "output_\\d+\\.csv")
+
+# Print the list of files found
+cat("Files found:\n", paste(output_files, collapse = "\n"))
+
+# Check if any files were found
+if (length(output_files) > 0) {
+  # Loop through each file, read it, and plot it
+  for (file in output_files) {
+    # Read file from disk into full history 
+    all <- allHistory(file)
+    
+    # Create a plot for the current file
+    plot(all)
+    
+    # Add a title to the plot
+    plot_title <- paste0("Plot for ", file)
+    title(main = plot_title)
+    
+    # Add a pause between plots (press Enter to view the next plot)
+    readline(prompt = "Press Enter to view the next plot...")
+  }
+} else {
+  cat("No files with the naming convention 'output_#.csv' were found in 
+the current directory.")
+}
+
+

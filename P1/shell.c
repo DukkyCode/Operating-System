@@ -62,15 +62,25 @@ void process_exec(char *args[300][300], int process_num){
             // Redirect input from previous pipe
             if (i > 0) {
 		close(fd[i-1][1]);
-            	dup2(fd[i-1][0], STDIN_FILENO);
+
+		if(dup2(fd[i-1][0], STDIN_FILENO) == -1){
+			fprintf(stderr, "Fail to return the new file descriptor\n");
+            		exit(1);
+		}
+
             	close(fd[i-1][0]);
              }
 
             // Redirect output to current pipe
             if (i < process_num) {
 		close(fd[i][0]);
-            	dup2(fd[i][1], STDOUT_FILENO);
-            	close(fd[i][1]);
+
+		if(dup2(fd[i][1], STDOUT_FILENO) == -1){
+                        fprintf(stderr, "Fail to return the new file descriptor\n");
+                        exit(1);
+		}
+
+		close(fd[i][1]);
             }
             // Execute process
             if (execvp(args[i][0], args[i]) == -1) {
@@ -146,7 +156,11 @@ int main(int argc, char const *argv[])
 
         /*Get Input from the user*/
         printf("%s ", prompt);
-        fgets(line, sizeof(line), stdin);
+
+	if(fgets(line, sizeof(line), stdin) == NULL){
+        	fprintf(stderr, "Fail to get read lines of input\n");
+                exit(1);
+	}
 
 	if(line[0] != '\n'){
 		token = strtok(line, "|");
