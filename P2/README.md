@@ -33,7 +33,10 @@ function do? How would you use it to measure the amount of time required
 ### Answer:
 
 The function gettimeofday(struct timeval *restrict tv, struct timezone *restrict tz) set the
-time in timeval structure "tv" member. It will give time elapsed since the Epoch, which is 1970-01-01 00:00:00 +0000 (UTC). We will call the function gettimeofday() to get a start time before calling function 'foo()' and an end time after foo() is finished. The latency or delay will be measured by the subtraction of the start time and end time.
+time in timeval structure "tv" member. It will give time elapsed since the Epoch, which is 
+1970-01-01 00:00:00 +0000 (UTC). We will call the function gettimeofday() 
+to get a start time before calling function 'foo()' and an end time after foo() is finished. 
+The latency or delay will be measured by the subtraction of the start time and end time.
 
 ## Question 2
 
@@ -45,7 +48,13 @@ being called with the `RUSAGE_SELF` argument.) How are the user time
 
 ### Answer:
 
-The time returned by `gettimeofday()` will give you time elasped since the Epoch. Assuming you are getting the latency from `gettimeofday()` using the formula `(start_time - end_time)`, then the time from the latency will be the elapsed time of the process spend in both user mode and kernel mode. Moreover, if you have multiple processes running concurrently, it will include the time slices used by other processes and the time the process got interrupted(I/O). `ru_utime`, on the other hand, is only the amount of CPU time spent in user-mode within the process, and `ru_stime` is the CPU time spend in the kernel within the process.
+The time returned by `gettimeofday()` will give you time elasped since the Epoch. 
+Assuming you are getting the latency from `gettimeofday()` using the formula `(start_time - end_time)`,
+ then the time from the latency will be the elapsed time of the process spend in both user mode and kernel mode. 
+Moreover, if you have multiple processes running concurrently, it will include the time slices used by 
+other processes and the time the process got interrupted(I/O). `ru_utime`, on the other hand, is 
+only the amount of CPU time spent in user-mode within the process, and `ru_stime` is the C
+PU time spend in the kernel within the process.
 
 ## Question 3
 
@@ -59,7 +68,12 @@ precision will help you to answer the next question.)
 
 ### Answer:
 
-In terms of measuring a job that takes less than a minute to do, with only a digital clock that can only show hours and minutes, it is difficult to measure it in terms of accuracy because you can never get the most accurate time of the job after the job is done. That's why for this matter, we can only focus on precision. We will start the clock and do the job for N times. Then, we stop the clock and measure the overall time to finish N job. Finally, we average the amount of time to get the time for each job.
+In terms of measuring a job that takes less than a minute to do, with only a digital clock that 
+can only show hours and minutes, it is difficult to measure it in terms of accuracy because you 
+can never get the most accurate time of the job after the job is done. That's why for this matter, 
+we can only focus on precision. We will start the clock and do the job for N times. Then, we stop
+ the clock and measure the overall time to finish N job. Finally, we average the amount of time
+ to get the time for each job.
 
 ## Question 4
 
@@ -89,7 +103,11 @@ print (end time - start time) / N
 
 ### Answer:
 
-The first approach is incrementing the elapsed time of foo() between each time it loops and compute the average. The second approach measures the total time taken by N calls to foo() and then divides by N to get the average time per call. The second approach should be better because it measures the total time taken of the entire loop as a single unit, which reduces the impact of any measurement overhead.
+The first approach is incrementing the elapsed time of foo() between each time it loops and 
+compute the average. The second approach measures the total time taken by N calls to foo() and 
+then divides by N to get the average time per call. The second approach should be better because
+it measures the total time taken of the entire loop as a single unit, which reduces the impact 
+of any measurement overhead.
 
 ## Question 5
 
@@ -105,7 +123,8 @@ for (i = 0; i < N; ++i) {
 
 ### Answer:
 
-The code also performs `for (i = 0; i < N; ++i)` which it will increment the value of i, compare with N , and branch back to the top of the loop.
+The code also performs `for (i = 0; i < N; ++i)` which it will increment the value of i, c
+ompare with N , and branch back to the top of the loop.
 
 ## Question 6
 
@@ -117,7 +136,10 @@ your final measurement value includes _only_ the average time required to call
 
 ### Answer:
 
-`for (i = 0; i < N; ++i)` can cause problem with both accuracy because it might take more time for the code to process the loop than the actual `foo()` function itself. You can include _only_ the average time required to call `foo()` by using approach 1 from question 4. Inside the loop, you will measure the elasped time of `foo()` and compute the the average time outside of the loop.
+First, we have to measure the time to execute the loop `for(i = 0; i < N; i++)` 
+without the calling the foo() function. Then, we will measure the time to execute the loop
+with the foo() function. The time difference between these two measurement will be the time
+calling foo() N times and we get the measurement for foo() by the difference by N.
 
 # Part B
 
@@ -137,7 +159,9 @@ adjustments you had to figure out just for specific ones)
 
 ### Answer:
 
-- To measure the start time right before the operation execution and end time right after the operation execution. Try to make sure that the elapsed time does not get affected by external factor.
+- My general strategy is to measure the start time before the loop and end time after the loop with 
+and without the function that I want to measure. The time to execute the calling function or syscall 
+will be `(loop_with_function - empty_loop)/(number of loops)` 
 
 ## Question 8
 
@@ -150,29 +174,29 @@ exponential notation, or in microseconds as an integer value. Write the units.)
 
 - allocate one page of memory with `mmap()`
 
-  - user time: **0.000000 s**
-  - system time: **0.000003 s**
+  - user time: **0.037680 us**
+  - system time: **0.366040 s**
 
 - lock a mutex with `pthread_mutex_lock()`
 
-  - user time: **0.000000 s**
-  - system time: **0.000001 s**
+  - user time: **0.001660 us**
+  - system time: **0.008520 us**
 
 - writing 4096 Bytes directly (bypassing the disk page cache) to /tmp
 
-  - wall-clock time: **0.001115 s**
+  - wall-clock time: **862.585440 us**
 
 - reading 4096 Bytes directly (bypassing the disk page cache) from /tmp
 
-  - wall-clock time: **0.000003 s**
+  - wall-clock time: **287.743400 us**
 
 - writing 4096 Bytes to the disk page cache
 
-  - wall-clock time: **0.000017 s**
+  - wall-clock time: **2.320360 us**
 
 - reading 4096 Bytes from the disk page cache
 
-  - wall-clock time: **0.000004 s**
+  - wall-clock time: **1.129220 us**
 
 - Syscalls: **[mmap(), open(), read(), write()]**
 - Not syscalls: **[pthread_mutex_lock, posix_memalign(), malloc()]**
@@ -192,7 +216,9 @@ more than once without unlocking it first?
 
 ### Answer:
 
-Everytime I initialize a mutex and lock, I will always unlock and destroy the mutex afterwards. In this assignment, however, there is only one mutex so the probem above does not occur if you unlock and destroy properly.
+I will just initialize all the locks in a loop. Then, we make a loop to lock
+all the mutexes and measure them. Afterwards, make another loop to unlock and
+destroy them.
 
 ## Question 11
 
@@ -201,7 +227,9 @@ If so, which is faster?
 
 ### Answer:
 
-The performance of a file acesss operations can definitely be affected by whether the operation is a read or a write. In the above measurement, writing operation tends to be slower than the reading operation which can also be true in normal application.
+The performance of a file acesss operations can definitely be affected by whether the
+operation is a read or a write. In the above measurement, writing operation tends to be 
+slower than the reading operation which can also be true in normal application.
 
 ## Question 12
 
@@ -210,4 +238,7 @@ affect reads and write differently?
 
 ### Answer:
 
-It can affect both read and write greatly because cache can be used to reduce the amount of time required to access the data, especially on read as you need subsequent reads of the same data. For the above experiment, write takes more time because it has to access main memory to fetch the data and write it to the file, which can be seen the time difference between the two experiments.
+It affect both read and write greatly because cache can be used to reduce the amount of time 
+required to access the data, especially on read as you need subsequent reads of the same data. 
+For the above experiment, read and write without using the disk cache take a significant more 
+time than with using the disk cache.

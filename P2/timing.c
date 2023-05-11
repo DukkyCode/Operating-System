@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+
 #include <sys/resource.h>
 #include <unistd.h>
 #include <sys/mman.h>
@@ -9,111 +10,126 @@
 #include <sys/time.h>
 #include <fcntl.h>
 #include <stdint.h>
+#include <string.h>
+#include <math.h>
 
-pthread_mutex_t mutex;
-/*Main Function*/
-int main (int argc, char const *argv[]){
-	// Declare Variables
-	(void)argc;
-	(void)argv;
-	struct rusage usage;
-	struct timeval start_user, start_system, end_user, end_system;
+long double elapsed_time(struct timeval start, struct timeval end){
+	//Get the Elapsed seconds and microseconds
+	long double seconds = end.tv_sec - start.tv_sec;
+	long double useconds = end.tv_usec - start.tv_usec;
 
-	// Measuring mmap() Reousrce Usage
-	getrusage(RUSAGE_SELF, &usage);
-	start_user = usage.ru_utime;
-	start_system = usage.ru_stime;
-
-	void *ptr = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1 , 0);
-
-	getrusage(RUSAGE_SELF, &usage);
-        end_user = usage.ru_utime;
-	end_system = usage.ru_stime;
-
-	if(ptr == MAP_FAILED){
-		perror("Fail to allocate mmap");
-		exit(1);
+	if(useconds < 0){
+		useconds += 1000000;
+		seconds -=1;
 	}
 
-	long mmap_user_sec  = end_user.tv_sec - start_user.tv_sec;
-	long mmap_user_usec = end_user.tv_usec - start_user.tv_usec;
+	long double ret = seconds * 1000000.0 + useconds;
+	return ret;
+}
 
-        long mmap_system_sec  = end_system.tv_sec - start_system.tv_sec;
-        long mmap_system_usec = end_system.tv_usec - start_system.tv_usec;
 
-	// Print User time and System time to allocate mmap
-	printf("mmap() User time: %ld.%.06ld s\n", mmap_user_sec, mmap_user_usec);
-	printf("mmap() System time: %ld.%.06ld s\n", mmap_system_sec, mmap_system_usec);
+//Main Function
+int main(int argc, char const *argv[]){
+	(void) argc;
+	(void) argv;
 
-	//Mutex Initialization
-	int mut_ret = pthread_mutex_init(&mutex, NULL);
-	if (mut_ret != 0){
-		perror("Fail to Initialize Mutex");
-		exit(1);
+	//Declaring variables
+	int loop_time = 50000;			//Loop time
+	int i;
+	struct rusage start_time, end_time;
+
+	//Measuring an empty loop
+	getrusage(RUSAGE_SELF, &start_time);
+
+	for(i = 0; i < loop_time; i++){
+		//Empty Loop
 	}
 
-	// Measuring Locking the thread_mutex
-        getrusage(RUSAGE_SELF, &usage);
-        start_user = usage.ru_utime;
-        start_system = usage.ru_stime;
+	getrusage(RUSAGE_SELF, &end_time);
 
+	long double emptyLoop_utime = elapsed_time(start_time.ru_utime, end_time.ru_utime);
+	long double emptyLoop_stime = elapsed_time(start_time.ru_stime, end_time.ru_stime);
 
-	int lock_ret = pthread_mutex_lock(&mutex);
+	//Allocating One page of memory with mmap()
+	getrusage(RUSAGE_SELF, &start_time);
+	void *ptr;
 
-        if (lock_ret != 0){
-                perror("Fail to lock Mutex");
-                exit(1);
+        for(i = 0; i < loop_time; i++){
+                //mmap()
+		ptr = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1 , 0);
+
         }
 
-        getrusage(RUSAGE_SELF, &usage);
-        end_user = usage.ru_utime;
-        end_system = usage.ru_stime;
+	getrusage(RUSAGE_SELF, &end_time);
 
-        long lock_user_sec  = end_user.tv_sec - start_user.tv_sec;
-        long lock_user_usec = end_user.tv_usec - start_user.tv_usec;
+	//Calculating the mmap Average User time and system time
+	long double mmap_utime = (elapsed_time(start_time.ru_utime, end_time.ru_utime) - emptyLoop_utime) / loop_time;
+	long double mmap_stime = (elapsed_time(start_time.ru_stime, end_time.ru_stime) - emptyLoop_stime) / loop_time;
 
-        long lock_system_sec  = end_system.tv_sec - start_system.tv_sec;
-        long lock_system_usec = end_system.tv_usec - start_system.tv_usec;
+	printf("mmap() User Time: %Lf us\n", mmap_utime);
+        printf("mmap() System Time: %Lf us\n", mmap_stime);
 
-        // Print User time and System time to Lock the Mutex
-        printf("pthread_mutex_lock() User time: %ld.%.06ld s\n", lock_user_sec, lock_user_usec);
-        printf("pthread_mutex_lock() System time: %ld.%.06ld s\n", lock_system_sec, lock_system_usec);
+	//Lock a mutex with pthread_mutex_lock()
+	//Mutex Variables
+	pthread_mutex_t mutex[loop_time];
 
-        // Unlock the Mutex
-        int unlock_ret = pthread_mutex_unlock(&mutex);
+	for(i = 0; i < loop_time; i++){
+		pthread_mutex_init(&mutex[i], NULL);
+	}
 
-        if (unlock_ret != 0){
-                perror("Fail to unlock Mutex");
-                exit(1);
+	//Lock and Measure
+	getrusage(RUSAGE_SELF, &start_time);
+
+	for(i = 0; i < loop_time; i++){
+		//Locking mechanism
+		pthread_mutex_lock(&mutex[i]);
+	}
+
+	getrusage(RUSAGE_SELF, &end_time);
+
+        //Calculating the mmap Average User time and system time
+        long double lock_utime = (elapsed_time(start_time.ru_utime, end_time.ru_utime) - emptyLoop_utime) / loop_time;
+
+	if(lock_utime < 0){
+		lock_utime = fabsl(lock_utime);
+	}
+
+        long double lock_stime = (elapsed_time(start_time.ru_stime, end_time.ru_stime) - emptyLoop_stime) / loop_time;
+
+	if(lock_stime < 0){
+		lock_stime = fabsl(lock_stime);
+	}
+
+
+        printf("pthread_mutex_lock() User Time: %Lf us\n", lock_utime);
+        printf("pthread_mutex_lock() System Time: %Lf us\n", lock_stime);
+
+	//Unlock the mutexes after measurements
+        for(i = 0; i < loop_time; i++){
+                pthread_mutex_unlock(&mutex[i]);
         }
 
-        // Destroy the Mutex & Deallocate Memory
-        int destroy_ret = pthread_mutex_lock(&mutex);
-
-        if (destroy_ret != 0){
-                perror("Fail to Destroy Mutex");
-                exit(1);
-        }
-
-        int unmap = munmap(ptr, 4096);
-        if (unmap != 0) {
-                perror("Fail to deallocate mmap");
-                exit(1);
-        }
-
-	//Second Part:
-	//Create a file desciptor in the temp directory
-	//Variables for Part II
+	////Part B:
+	//Variables
 	struct timeval start, end;
-	long time_sec, time_usec;
-
 	char *buffer = NULL;
-	int file_ret;
 	char filename[] = "/tmp/TestAssignment2";
-	/////////////////////////////////////////////////
-	//Write 4096 bytes to /tmp
-	int fd = open(filename, O_CREAT | O_WRONLY | O_DIRECT | O_SYNC, 0666);
-   	if (fd < 0) {
+
+	//Measuring Wall-Clock time of an empty loop
+	gettimeofday(&start, NULL);
+
+	for(i = 0; i < loop_time; i++){
+		//Empty Loop
+	}
+
+	gettimeofday(&end, NULL);
+
+	long double emptyLoop_wtime = elapsed_time(start, end);
+
+	//Writing 4096 bytes to /tmp
+	int fd = open(filename, O_CREAT | O_RDWR | O_DIRECT | O_SYNC, 0666);
+
+	if (fd < 0) {
         	perror("Failed to open file");
         	exit(1);
     	}
@@ -124,134 +140,157 @@ int main (int argc, char const *argv[]){
         	exit(1);
     	}
 
-	//Write Execution
+	memset(buffer, 1, 4096);
+
+	//Measuring the wall clock time
 	gettimeofday(&start, NULL);
-	file_ret = write(fd, buffer, 4096);
+
+	for(i = 0; i < loop_time; i++){
+		write(fd, buffer, 4096);
+	}
+
 	gettimeofday(&end, NULL);
 
-	time_sec = end.tv_sec - start.tv_sec;
-	time_usec = end.tv_usec - start.tv_usec;
+	long double writeDirect_wtime = (elapsed_time(start, end) - emptyLoop_wtime)/ loop_time;
 
-	printf("Time to write 4096 bytes to /tmp: %ld.%06ld\n", time_sec, time_usec);
+	printf("Writing 4096 bytes(bypassing the disk page cache): %Lf us\n", writeDirect_wtime);
 
-	if(file_ret < 0){
-		perror("Fail to write to file");
-		exit(1);
-	}
 	//Cleaning up
 	free(buffer);
 	close(fd);
-	if (unlink(filename) != 0){
-        	perror("Fail to Unlink the file");
-        	exit(1);
-    	}
-	////////////////////////////////////////////
-        //Read 4096 bytes from /tmp
-        fd = open(filename, O_CREAT | O_RDWR | O_DIRECT | O_SYNC, 0666);
+
+	//if (unlink(filename) != 0){
+        	//perror("Fail to Unlink the file");
+        	//exit(1);
+    	//}
+
+	//Reading 4096 Bytes directly to the disk page cache
+	fd = open(filename, O_CREAT | O_RDWR | O_DIRECT | O_SYNC, 0666);
+	char *buffer1 = NULL;
+
         if (fd < 0) {
                 perror("Failed to open file");
                 exit(1);
         }
 
         //Align Memory Buffer
-        if (posix_memalign((void**)&buffer, 512, 4096) != 0) {
+        if (posix_memalign((void**)&buffer1, 512, 4096) != 0) {
                 perror("Failed to allocate aligned memory");
                 exit(1);
         }
 
-        //Executing Read 
+        memset(buffer1, 1, 4096);
+
+	//Measuring the wall-clock Time
+
         gettimeofday(&start, NULL);
-        file_ret = read(fd, buffer, 4096);
+
+        for(i = 0; i < loop_time; i++){
+                read(fd, buffer1, 4096);
+        }
+
         gettimeofday(&end, NULL);
 
-        time_sec = end.tv_sec - start.tv_sec;
-        time_usec = end.tv_usec - start.tv_usec;
+        long double readDirect_wtime = (elapsed_time(start, end) - emptyLoop_wtime)/ loop_time;
 
-        printf("Time to read 4096 bytes to /tmp: %ld.%06ld\n", time_sec, time_usec);
+        printf("Reading 4096 bytes (bypassing the disk page cache): %Lf us\n", readDirect_wtime);
 
-        if(file_ret < 0){
-                perror("Fail to write to file");
-                exit(1);
-        }
-
-	//Cleaning up
-        free(buffer);
+        //Cleaning up
+        free(buffer1);
         close(fd);
-        if (unlink(filename) != 0){
-                perror("Fail to Unlink the file");
-                exit(1);
-        }
 
-	////////////////////////////////////////////////////
-    	// Writing 4096 Bytes to the disk page cache
+	//if (unlink(filename) != 0){
+        	//perror("Fail to Unlink the file");
+        	//exit(1);
+    	//}
+
+
+	//Writing 4096 bytes to the disk page cache
     	fd = open(filename, O_CREAT | O_WRONLY, 0666);
+	char *buffer2;
     	if (fd < 0) {
         	perror("Failed to open file");
         	exit(1);
     	}
+
 	//Allocating Memory
-    	buffer = malloc(4096);
-    	if (buffer == NULL) {
+    	buffer2 = malloc(4096);
+    	if (buffer2 == NULL) {
         	perror("Failed to allocate memory");
         	exit(1);
     	}
-        //Executing Write
+	memset(buffer2, 1, 4096);
+
+	//Measuring Wall Clock time
         gettimeofday(&start, NULL);
-        file_ret = write(fd, buffer, 4096);
+
+        for(i = 0; i < loop_time; i++){
+                write(fd, buffer2, 4096);
+        }
+
         gettimeofday(&end, NULL);
 
-        time_sec = end.tv_sec - start.tv_sec;
-        time_usec = end.tv_usec - start.tv_usec;
+        long double write_wtime = (elapsed_time(start, end) - emptyLoop_wtime)/ loop_time;
 
-        printf("Time to write 4096 bytes to disk page cache: %ld.%06ld\n", time_sec, time_usec);
-
-        if(file_ret < 0){
-                perror("Fail to write to file");
-                exit(1);
-        }
+        printf("Writing 4096 bytes to disk page cache: %Lf us\n", write_wtime);
 
         //Cleaning up
-        free(buffer);
+        free(buffer2);
         close(fd);
-        if (unlink(filename) != 0){
-                perror("Fail to Unlink the file");
-                exit(1);
-        }
-        ////////////////////////////////////////////////////
-        // Reading 4096 Bytes to the disk page cache
-        fd = open(filename, O_CREAT | O_RDWR, 0666);
+
+        //if (unlink(filename) != 0){
+                //perror("Fail to Unlink the file");
+                //exit(1);
+        //}
+
+        //Reading 4096 bytes to the disk page cache
+        fd = open(filename, O_CREAT | O_RDONLY, 0666);
+        char *buffer3;
         if (fd < 0) {
                 perror("Failed to open file");
                 exit(1);
         }
+
         //Allocating Memory
-        buffer = malloc(4096);
-        if (buffer == NULL) {
+        buffer3 = malloc(4096);
+        if (buffer3 == NULL) {
                 perror("Failed to allocate memory");
                 exit(1);
         }
-        //Executing Read
+
+        memset(buffer3, 1, 4096);
+
+        //Measuring Wall Clock time
         gettimeofday(&start, NULL);
-        file_ret = read(fd, buffer, 4096);
-        gettimeofday(&end, NULL);
 
-        time_sec = end.tv_sec - start.tv_sec;
-        time_usec = end.tv_usec - start.tv_usec;
-
-        printf("Time to read 4096 bytes to disk page cache: %ld.%06ld\n", time_sec, time_usec);
-
-        if(file_ret < 0){
-                perror("Fail to write to file");
-                exit(1);
+        for(i = 0; i < loop_time; i++){
+                read(fd, buffer3, 4096);
         }
 
+        gettimeofday(&end, NULL);
+
+        long double read_wtime = (elapsed_time(start, end) - emptyLoop_wtime)/ loop_time;
+
+        printf("Reading 4096 bytes to disk page cache: %Lf us\n", read_wtime);
+
         //Cleaning up
-        free(buffer);
+        free(buffer3);
         close(fd);
+
         if (unlink(filename) != 0){
                 perror("Fail to Unlink the file");
                 exit(1);
         }
 
+
 	return 0;
 }
+
+
+
+
+
+
+
+
+
